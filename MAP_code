@@ -1,0 +1,719 @@
+library(ggplot2)
+library(grid)
+library(vegan)
+library(mctoolsr)
+library(PMCMRplus)
+library(stats)
+library(dplyr)
+library(FSA)
+library(phyloseq)
+
+
+MAP_input = load_taxa_table("otu-table-w-taxonomy-deblur.txt", "MAP_metadata.txt")
+
+###rarify
+
+sort <- sort(colSums(MAP_input$data_loaded))
+
+print(sort)
+
+BM_rar = filter_data(MAP_input, 'env_material', keep_vals = 'breast milk')
+
+fecal_rar = filter_data(MAP_input, 'env_material', keep_vals = 'feces')
+
+sort_BM <- sort(colSums(BM$data_loaded))
+
+print(sort_BM)
+
+sort_fecal <- sort(colSums(fecal$data_loaded))
+
+print(sort_fecal)
+
+BM_rar = single_rarefy(BM, 7400)
+
+sort_BM_rar <- sort(colSums(BM_rar$data_loaded))
+
+print(sort_BM_rar)
+
+fecal_rar = single_rarefy(fecal, 14000)
+
+sort_fecal_rar <- sort(colSums(fecal_rar$data_loaded))
+
+print(sort_fecal_rar)
+
+#only fecal represented here, but 'fecal_rar' can be replaced by 'BM-rar' for milk-associated analyses#
+
+####Richness
+
+richness_fecal <- calc_diversity(fecal_rar$data_loaded, metric = "richness")
+
+sort(richness_fecal)
+
+rich.map_fecal <- merge(richness_fecal, fecal_rar$map_loaded, by=0, all=TRUE)
+
+plot_diversity(fecal_rar, variable = "timepoint", metric = "richness")
+
+plot_diversity(fecal_rar, variable = "Diagnosis", metric = "richness")
+
+#richness - delivery method
+
+kruskal.test(`x`~delivery_method, data=rich.map_fecal)
+
+#richness - abx_during_delivery
+
+fecal_rar_abx_during_delivery = filter_data(fecal_rar, 'abx_during_delivery', filter_vals = 'not applicable')
+
+richness_abx_during_delivery <- calc_diversity(fecal_rar_abx_during_delivery$data_loaded, metric = "richness")
+
+rich.map_add <- merge(richness_abx_during_delivery, fecal_rar$map_loaded, by=0, all=TRUE)
+
+kruskal.test(`x`~abx_during_delivery, data=rich.map_add)
+
+#richenss - abx_during_pregnancy
+
+kruskal.test(`x`~abx_during_pregnancy, data=rich.map_fecal)
+
+#richness - abx_for_chorio
+
+richness_abx_for_chorio <- calc_diversity(fecal_rar_abx_for_chorio, metric = "richness")
+
+rich.map_adp <- merge(richness_abx_during_pregnancy, fecal_rar$map_loaded, by=0, all=TRUE)
+
+kruskal.test(`x`~abx_for_chorio, data=rich.map_fecal)
+
+#richness - abx_for_pprom
+
+kruskal.test(`x`~abx_for_pprom, data=rich.map_fecal)
+
+#richness - abx_during_pregnancy
+
+kruskal.test(`x`~other_abx_during_pregnancy, data=rich.map_fecal)
+
+#richness - bottle_feeding_started
+
+richness_bottle_feeding_started <- calc_diversity(fecal_rar_bottle_feeding_started, metric = "richness")
+
+rich.map_adp <- merge(richness_abx_during_pregnancy, fecal_rar$map_loaded, by=0, all=TRUE)
+
+kruskal.test(`x`~bottle_feeding_started, data=rich.map_fecal)
+
+#richness - breastfeeding_started
+
+kruskal.test(`x`~breastfeeding_started, data=rich.map_fecal)
+
+#richness - type_of_milk
+
+kruskal.test(`x`~type_of_milk, data=rich.map_fecal)
+
+#richness - delivery_method
+
+richness_delivery_method <- calc_diversity(fecal_rar_delivery_method$data_loaded, metric = "richness")
+
+rich.map_dm <- merge(richness_delivery_method, fecal_rar$map_loaded, by=0, all=TRUE)
+
+kruskal.test(`x`~delivery_method, data=rich.map_dm)
+
+#richness - timepoint
+
+kruskal.test(`x`~timepoint, data=rich.map_fecal)
+
+#richness - infant_abx
+
+kruskal.test(`x`~infant_abx, data=rich.map_fecal)
+
+#richness - diagnosis
+
+richness_diag <- calc_diversity(fecal_rar_diag$data_loaded, metric = "richness")
+
+rich.map_diag <- merge(richness_diag, fecal_rar$map_loaded, by=0, all=TRUE)
+
+kruskal.test(`x`~Diagnosis, data=rich.map_diag)
+
+#richness - diagnosis at timepoint 1
+
+richness_diag_T1 <- calc_diversity(fecal_rar_T1$data_loaded, metric = "richness")
+
+rich.map_T1 <- merge(richness_diag_T1, fecal_rar$map_loaded, by=0, all=TRUE)
+
+kruskal.test(`x`~Diagnosis, data=rich.map_T1)
+
+#richness - diagnosis at timepoint 2
+
+richness_diag_T2 <- calc_diversity(fecal_rar_T2$data_loaded, metric = "richness")
+
+rich.map_T2 <- merge(richness_diag_T2, fecal_rar$map_loaded, by=0, all=TRUE)
+
+kruskal.test(`x`~Diagnosis, data=rich.map_T2)
+
+#richness - diagnosis at timepoint 3
+
+richness_diag_T3 <- calc_diversity(fecal_rar_T3$data_loaded, metric = "richness")
+
+rich.map_T3 <- merge(richness_diag_T3, fecal_rar$map_loaded, by=0, all=TRUE)
+
+kruskal.test(`x`~Diagnosis, data=rich.map_T3)
+
+#calculate genera in samples
+
+fecal_timepoint = filter_data(fecal_rar, 'timepoint', filter_vals = 'not recorded')
+
+tax_sum_species_fecal_day <- summarize_taxonomy(fecal_rar, level = 6, report_higher_tax = TRUE)
+
+sum_spp_fecal_day <- taxa_summary_by_sample_type(taxa_smry_df = tax_sum_species_fecal_day, 'timepoint', metadata_map = fecal_rar$map_loaded, smry_fun = mean)
+
+tax_spp_fecal_plot_day <- plot_taxa_bars(tax_sum_species_fecal_day, fecal_rar$map_loaded, type_header = "timepoint", num_taxa = 10)
+
+p = plot(tax_spp_fecal_plot_day)
+
+p = p + scale_fill_brewer(palette="Spectral")
+
+p
+
+#calculate species in samples
+
+fecal_rar = filter_data(fecal_rar, 'timepoint', filter_vals = 'not recorded')
+
+tax_sum_species_fecal_day <- summarize_taxonomy(fecal_rar, level = 7, report_higher_tax = TRUE)
+
+sum_spp_fecal_day <- taxa_summary_by_sample_type(taxa_smry_df = tax_sum_species_fecal_day, 'timepoint', metadata_map = fecal_rar$map_loaded, smry_fun = mean)
+
+tax_spp_fecal_plot_day <- plot_taxa_bars(tax_sum_species_fecal_day, fecal_rar$map_loaded, type_header = "timepoint", num_taxa = 10)
+
+ps = plot(tax_spp_fecal_plot_day)
+
+ps = ps + scale_fill_brewer(palette="Spectral")
+
+ps
+
+#Bacteroides
+
+Bacteroides_fecal <- filter_taxa_from_input(fecal_rar, taxa_to_keep = 'g__Bacteroides')
+
+Bacteroides_fecal.tot <- as.data.frame(colSums(Bacteroides_fecal$data_loaded))
+
+print(Bacteroides_fecal.tot)
+
+names(Bacteroides_fecal.tot)[names(Bacteroides_fecal.tot)=="colSums(Bacteroides_fecal$data_loaded)"]
+
+Bacteroides_fecal.per <- ((Bacteroides_fecal.tot)/14000)*100
+
+plot(Bacteroides_fecal.per)
+
+Bacteroides_fecal.per.map <- merge(Bacteroides_fecal.per, fecal_rar$map_loaded, by=0, all=TRUE)
+
+aggregate(Bacteroides_fecal.per.map$`colSums(Bacteroides_fecal$data_loaded)`~Diagnosis, Bacteroides_fecal.per.map, mean)
+
+kruskal.test(`colSums(Bacteroides_fecal$data_loaded)`~Diagnosis, data=Bacteroides_fecal.per.map)
+
+ano <- aov(`colSums(Bacteroides_fecal$data_loaded)`~Diagnosis, data=Bacteroides_fecal.per.map)
+
+summary(ano)
+
+#Bacteroides by timepoint
+
+t = aggregate(Bacteroides_fecal.per.map$`colSums(Bacteroides_fecal$data_loaded)`~timepoint, Bacteroides_fecal.per.map, mean)
+
+print(t)
+
+#Bacteroides by timepoint for asthma only diagnosis
+
+Bacteroides_fecal_asthma <- filter_data(Bacteroides_fecal, 'Diagnosis', keep_vals = 'Asthma')
+
+Bacteroides_fecal_asthma.tot <- as.data.frame(colSums(Bacteroides_fecal_asthma$data_loaded))
+
+print(Bacteroides_fecal_asthma.tot)
+
+names(Bacteroides_fecal_asthma.tot)[names(Bacteroides_fecal_asthma.tot)=="colSums(Bacteroides_fecal_asthma$data_loaded)"]
+
+Bacteroides_fecal_asthma.per <- ((Bacteroides_fecal_asthma.tot)/14000)*100
+
+plot(Bacteroides_fecal_asthma.per)
+
+Bacteroides_fecal_asthma.per.map <- merge(Bacteroides_fecal_asthma.per, fecal_rar$map_loaded, by=0, all=TRUE)
+
+a = aggregate(Bacteroides_fecal_asthma.per.map$`colSums(Bacteroides_fecal_asthma$data_loaded)`~timepoint, Bacteroides_fecal_asthma.per.map, mean)
+
+print(a)
+
+#Bacteroides by timepoint for control only
+
+Bacteroides_fecal_control <- filter_data(Bacteroides_fecal, 'Diagnosis', keep_vals = 'Control')
+
+Bacteroides_fecal_control.tot <- as.data.frame(colSums(Bacteroides_fecal_control$data_loaded))
+
+print(Bacteroides_fecal_control.tot)
+
+names(Bacteroides_fecal_control.tot)[names(Bacteroides_fecal_control.tot)=="colSums(Bacteroides_fecal_control$data_loaded)"]
+
+Bacteroides_fecal_control.per <- ((Bacteroides_fecal_control.tot)/14000)*100
+
+plot(Bacteroides_fecal_control.per)
+
+Bacteroides_fecal_control.per.map <- merge(Bacteroides_fecal_control.per, fecal_rar$map_loaded, by=0, all=TRUE)
+
+b = aggregate(Bacteroides_fecal_control.per.map$`colSums(Bacteroides_fecal_control$data_loaded)`~timepoint, Bacteroides_fecal_control.per.map, mean)
+
+print(b)
+
+#Bacteroides - timepoint 3
+
+Bacteroides_fecal_3 = filter_data(Bacteroides_fecal, 'timepoint', keep_vals = 'Timepoint 3')
+
+Bacteroides_fecal_3.tot <- as.data.frame(colSums(Bacteroides_fecal_3$data_loaded))
+
+print(Bacteroides_fecal_3.tot)
+
+names(Bacteroides_fecal_3.tot)[names(Bacteroides_fecal_3.tot)=="colSums(Bacteroides_fecal_3$data_loaded)"]
+
+Bacteroides_fecal_3.per <- ((Bacteroides_fecal_3.tot)/14000)*100
+
+plot(Bacteroides_fecal_3.per)
+
+print(Bacteroides_fecal_3.per)
+
+Bacteroides_fecal_3.per.map <- merge(Bacteroides_fecal_3.per, Bacteroides_fecal_3$map_loaded, by=0, all=TRUE)
+
+aggregate(Bacteroides_fecal_3.per.map$`colSums(Bacteroides_fecal_3$data_loaded)`~Diagnosis, Bacteroides_fecal_3.per.map, mean)
+
+kruskal.test(`colSums(Bacteroides_fecal_3$data_loaded)`~Diagnosis, data=Bacteroides_fecal_3.per.map)
+
+ano1 <- aov(`colSums(Bacteroides_fecal_3$data_loaded)`~Diagnosis, data=Bacteroides_fecal_3.per.map)
+
+summary(ano1)
+
+#taxa summary species - timepoint
+
+fecal_day = filter_data(fecal_rar, 'timepoint', filter_vals = 'not recorded')
+
+tax_sum_species_fecal_day <- summarize_taxonomy(fecal_day, level = 7, report_higher_tax = TRUE)
+
+sum_spp_fecal_day <- taxa_summary_by_sample_type(taxa_smry_df = tax_sum_species_fecal_day, 'timepoint', metadata_map = fecal_day$map_loaded, smry_fun = mean)
+
+tax_spp_fecal_plot_day <- plot_taxa_bars(tax_sum_species_fecal_day, fecal_day$map_loaded, type_header = "timepoint", num_taxa = 10)
+
+p = plot(tax_spp_fecal_plot_day)
+
+p = p + scale_fill_brewer(palette="Spectral")
+
+p
+
+tot_spp_fecal_day <- rowSums(tax_sum_species_fecal_day)
+
+write.table(sum_spp_fecal, "/Users/megan/Desktop/MAP_study/species_summary_fecal.txt", sep="\t")
+
+#taxa summary genera for 'Diagnosis'
+
+fecal_diagnosis = filter_data(fecal_rar, 'Diagnosis', filter_vals = 'not applicable')
+
+tax_sum_genera_fecal_diagnosis <- summarize_taxonomy(fecal_diagnosis, level = 6, report_higher_tax = TRUE)
+
+sum_gen_fecal_diagnosis <- taxa_summary_by_sample_type(taxa_smry_df = tax_sum_genera_fecal_diagnosis, 'Diagnosis', metadata_map = fecal_diagnosis$map_loaded, smry_fun = mean)
+
+tax_gen_fecal_plot_diagnosis <- plot_taxa_bars(tax_sum_genera_fecal_diagnosis, fecal_diagnosis$map_loaded, type_header = "Diagnosis", num_taxa = 10)
+
+p1 = sort(tax_gen_fecal_plot_diagnosis)
+
+p1 = p1 + scale_fill_brewer(palette="Spectral")
+
+p1
+
+tot_gen_fecal_diagnosis <- rowSums(sum_gen_fecal_diagnosis)
+
+write.table(sum_gen_fecal_diagnosis, "/Users/megan/Desktop/MAP_study/genera_summary_fecal.txt", sep="\t")
+
+#taxa summary genera for maternal 'Asthma' diagnosis
+
+fecal_asthma = filter_data(fecal_rar, 'Diagnosis', filter_vals = c('not applicable','Control'))
+
+fecal_asthma = filter_data(fecal_asthma, 'timepoint', filter_vals = 'not recorded')
+
+tax_sum_genera_fecal_asthma <- summarize_taxonomy(fecal_asthma, level = 6, report_higher_tax = TRUE)
+
+sum_gen_fecal_asthma <- taxa_summary_by_sample_type(taxa_smry_df = tax_sum_genera_fecal_asthma, 'timepoint', metadata_map = fecal_asthma$map_loaded, smry_fun = mean)
+
+tax_gen_fecal_plot_asthma <- plot_taxa_bars(tax_sum_genera_fecal_asthma, fecal_asthma$map_loaded, type_header = "timepoint", num_taxa = 10)
+
+p2 = plot(tax_gen_fecal_plot_asthma)
+
+p2 = p2 + scale_fill_brewer(palette="Spectral")
+
+p2
+
+#taxa summary genera for maternal 'Control' diagnosis
+
+fecal_control = filter_data(fecal_rar, 'Diagnosis', filter_vals = c('not applicable','Asthma'))
+
+fecal_control = filter_data(fecal_control, 'timepoint', filter_vals = 'not recorded')
+
+tax_sum_genera_fecal_control <- summarize_taxonomy(fecal_control, level = 6, report_higher_tax = TRUE)
+
+sum_gen_fecal_control <- taxa_summary_by_sample_type(taxa_smry_df = tax_sum_genera_fecal_control, 'timepoint', metadata_map = fecal_control$map_loaded, smry_fun = mean)
+
+tax_gen_fecal_plot_control <- plot_taxa_bars(tax_sum_genera_fecal_control, fecal_control$map_loaded, type_header = "timepoint", num_taxa = 10)
+
+p3 = plot(tax_gen_fecal_plot_control)
+
+p3 = p3 + scale_fill_brewer(palette="Spectral")
+
+p3
+
+write.table(sum_gen_fecal_asthma, "/Users/megan/Desktop/MAP_study/shotgun_genera_fecal_asthma_timepoint.txt", sep="\t")
+
+#taxa summary species for maternal 'Asthma' diagnosis
+
+tax_sum_species_fecal_asthma <- summarize_taxonomy(fecal_asthma, level = 7, report_higher_tax = TRUE)
+
+sum_species_fecal_asthma <- taxa_summary_by_sample_type(taxa_smry_df = tax_sum_species_fecal_asthma, 'timepoint', metadata_map = fecal_asthma$map_loaded, smry_fun = mean)
+
+write.table(sum_species_fecal_asthma, "/Users/megan/Desktop/MAP_study/shotgun_species_fecal_asthma_timepoint.txt", sep="\t")
+
+#taxa summary genera for mom 'Asthma' control
+
+fecal_control = filter_data(fecal_rar, 'Diagnosis', filter_vals = c('not applicable','Asthma'))
+
+tax_sum_genera_fecal_control <- summarize_taxonomy(fecal_control, level = 6, report_higher_tax = TRUE)
+
+sum_gen_fecal_control <- taxa_summary_by_sample_type(taxa_smry_df = tax_sum_genera_fecal_control, 'timepoint', metadata_map = fecal_control$map_loaded, smry_fun = mean)
+
+tax_gen_fecal_plot_control <- plot_taxa_bars(tax_sum_genera_fecal_control, fecal_control$map_loaded, type_header = "timepoint", num_taxa = 10)
+
+p3 = plot(tax_gen_fecal_plot_control)
+
+p3 = p3 + scale_fill_brewer(palette="Spectral")
+
+p3
+
+#taxa summary species for mom 'Asthma' control
+
+tax_sum_species_fecal_control <- summarize_taxonomy(fecal_control, level = 7, report_higher_tax = TRUE)
+
+sum_species_fecal_control <- taxa_summary_by_sample_type(taxa_smry_df = tax_sum_genera_fecal_control, 'timepoint', metadata_map = fecal_control$map_loaded, smry_fun = mean)
+
+write.table(sum_species_fecal_control, "/Users/megan/Desktop/MAP_study/shotgun_species_fecal_control_timepoint.txt", sep="\t")
+
+#Klebsiella
+
+Klebsiella_fecal <- filter_taxa_from_input(fecal_rar, taxa_to_keep = 'g__Klebsiella')
+
+Klebsiella_fecal.tot <- as.data.frame(colSums(Klebsiella_fecal$data_loaded))
+
+print(Klebsiella_fecal.tot)
+
+names(Klebsiella_fecal.tot)[names(Klebsiella_fecal.tot)=="colSums(Klebsiella_fecal$data_loaded)"]
+
+Klebsiella_fecal.per <- ((Klebsiella_fecal.tot)/14000)*100
+
+plot(Klebsiella_fecal.per)
+
+Klebsiella_fecal.per.map <- merge(Klebsiella_fecal.per, fecal_rar$map_loaded, by=0, all=TRUE)
+
+aggregate(Klebsiella_fecal.per.map$`colSums(Klebsiella_fecal$data_loaded)`~Diagnosis, Klebsiella_fecal.per.map, mean)
+
+kruskal.test(`colSums(Klebsiella_fecal$data_loaded)`~Diagnosis, data=Klebsiella_fecal.per.map)
+
+ano2 <- aov(`colSums(Klebsiella_fecal$data_loaded)`~Diagnosis, data=Klebsiella_fecal.per.map)
+
+summary(ano2)
+
+#Klebsiella by timepoint
+
+t = aggregate(Klebsiella_fecal.per.map$`colSums(Klebsiella_fecal$data_loaded)`~timepoint, Klebsiella_fecal.per.map, mean)
+
+print(t)
+
+#Klebsiella by timepoint for asthma only diagnosis
+
+Klebsiella_fecal_asthma <- filter_data(Klebsiella_fecal, 'Diagnosis', keep_vals = 'Asthma')
+
+Klebsiella_fecal_asthma.tot <- as.data.frame(colSums(Klebsiella_fecal_asthma$data_loaded))
+
+print(Klebsiella_fecal_asthma.tot)
+
+names(Klebsiella_fecal_asthma.tot)[names(Klebsiella_fecal_asthma.tot)=="colSums(Klebsiella_fecal_asthma$data_loaded)"]
+
+Klebsiella_fecal_asthma.per <- ((Klebsiella_fecal_asthma.tot)/14000)*100
+
+plot(Klebsiella_fecal_asthma.per)
+
+Klebsiella_fecal_asthma.per.map <- merge(Klebsiella_fecal_asthma.per, fecal_rar$map_loaded, by=0, all=TRUE)
+
+c = aggregate(Klebsiella_fecal_asthma.per.map$`colSums(Klebsiella_fecal_asthma$data_loaded)`~timepoint, Klebsiella_fecal_asthma.per.map, mean)
+
+print(c)
+
+#Klebsiella by timepoint for control only
+
+Klebsiella_fecal_control <- filter_data(Klebsiella_fecal, 'Diagnosis', keep_vals = 'Control')
+
+Klebsiella_fecal_control.tot <- as.data.frame(colSums(Klebsiella_fecal_control$data_loaded))
+
+print(Klebsiella_fecal_control.tot)
+
+names(Klebsiella_fecal_control.tot)[names(Klebsiella_fecal_control.tot)=="colSums(Klebsiella_fecal_control$data_loaded)"]
+
+Klebsiella_fecal_control.per <- ((Klebsiella_fecal_control.tot)/14000)*100
+
+plot(Klebsiella_fecal_control.per)
+
+Klebsiella_fecal_control.per.map <- merge(Klebsiella_fecal_control.per, fecal_rar$map_loaded, by=0, all=TRUE)
+
+d = aggregate(Klebsiella_fecal_control.per.map$`colSums(Klebsiella_fecal_control$data_loaded)`~timepoint, Klebsiella_fecal_control.per.map, mean)
+
+print(d)
+
+#Klebsiella - timepoint 3
+
+Klebsiella_fecal_3 = filter_data(Klebsiella_fecal, 'timepoint', keep_vals = 'Timepoint 3')
+
+Klebsiella_fecal_3.tot <- as.data.frame(colSums(Klebsiella_fecal_3$data_loaded))
+
+print(Klebsiella_fecal_3.tot)
+
+names(Klebsiella_fecal_3.tot)[names(Klebsiella_fecal_3.tot)=="colSums(Klebsiella_fecal_3$data_loaded)"]
+
+Klebsiella_fecal_3.per <- ((Klebsiella_fecal_3.tot)/14000)*100
+
+plot(Klebsiella_fecal_3.per)
+
+print(Klebsiella_fecal_3.per)
+
+Klebsiella_fecal_3.per.map <- merge(Klebsiella_fecal_3.per, Klebsiella_fecal_3$map_loaded, by=0, all=TRUE)
+
+aggregate(Klebsiella_fecal_3.per.map$`colSums(Klebsiella_fecal_3$data_loaded)`~Diagnosis, Klebsiella_fecal_3.per.map, mean)
+
+kruskal.test(`colSums(Klebsiella_fecal_3$data_loaded)`~Diagnosis, data=Klebsiella_fecal_3.per.map)
+
+ano3 <- aov(`colSums(Klebsiella_fecal_3$data_loaded)`~Diagnosis, data=Klebsiella_fecal_3.per.map)
+
+summary(ano3)
+
+#Bifidobacterium
+
+bifido_fecal <- filter_taxa_from_input(fecal_rar, taxa_to_keep = 'g__Bifidobacterium')
+
+bifido_fecal.tot <- as.data.frame(colSums(bifido_fecal$data_loaded))
+
+print(bifido_fecal.tot)
+
+names(bifido_fecal.tot)[names(bifido_fecal.tot)=="colSums(bifido_fecal$data_loaded)"]
+
+bifido_fecal.per <- ((bifido_fecal.tot)/14000)*100
+
+plot(bifido_fecal.per)
+
+bifido_fecal.per.map <- merge(bifido_fecal.per, fecal_rar$map_loaded, by=0, all=TRUE)
+
+aggregate(bifido_fecal.per.map$`colSums(bifido_fecal$data_loaded)`~Diagnosis, bifido_fecal.per.map, mean)
+
+#Akkermansia
+
+Akkermansia_fecal <- filter_taxa_from_input(fecal_BF, taxa_to_keep = 'g__Akkermansia')
+
+Akkermansia_fecal.tot <- as.data.frame(colSums(Akkermansia_fecal$data_loaded))
+
+print(Akkermansia_fecal.tot)
+
+names(Akkermansia_fecal.tot)[names(Akkermansia_fecal.tot)=="colSums(Akkermansia_fecal$data_loaded)"]
+
+Akkermansia_fecal.per <- ((Akkermansia_fecal.tot)/650)*100
+
+plot(Akkermansia_fecal.per)
+
+Akkermansia_fecal.per.map <- merge(Akkermansia_fecal.per, fecal_BF$map_loaded, by=0, all=TRUE)
+
+Akk = aggregate(Akkermansia_fecal.per.map$`colSums(Akkermansia_fecal$data_loaded)`~breastfeeding_started, Akkermansia_fecal.per.map, mean)
+
+print(Akk)
+
+####Community Composition
+
+dm_fecal = calc_dm(fecal_rar$data_loaded)
+
+ord_fecal = calc_ordination(dm_fecal, 'nmds')
+
+#maternal_complication_diabetes
+
+ado_fecal_maternal_complication_diabetes <- adonis(dm_fecal ~ maternal_complication_diabetes, data=fecal_rar$map_loaded, permutations=999, method="euclidean")
+
+print(ado_fecal_maternal_complication_diabetes)
+
+#abx_during_delivery
+
+ado_fecal_abx_during_delivery <- adonis(dm_fecal ~ abx_during_delivery, data=fecal_rar$map_loaded, permutations=999, method="euclidean")
+
+print(ado_fecal_abx_during_delivery)
+
+#abx_during_pregnancy
+
+fecal_rar_abx_during_pregnancy = filter_data(fecal_rar, 'abx_during_pregnancy', filter_vals = 'not applicable')
+
+dm_fecal_abx_during_pregnancy = calc_dm(fecal_rar_abx_during_pregnancy$data_loaded)
+
+ado_fecal_abx_during_pregnancy <- adonis(dm_fecal_abx_during_pregnancy ~ abx_during_pregnancy, data=fecal_rar$map_loaded, permutations=999, method="euclidean")
+
+print(ado_fecal_abx_during_pregnancy)
+
+#abx_for_chorio
+
+fecal_rar_abx_for_chorio = filter_data(fecal_rar, 'abx_for_chorio', filter_vals = 'not applicable')
+
+dm_fecal_abx_for_chorio = calc_dm(fecal_rar_abx_for_chorio$data_loaded)
+
+ado_fecal_abx_for_chorio <- adonis(dm_fecal_abx_for_chorio ~ abx_for_chorio, data=fecal_rar$map_loaded, permutations=999, method="euclidean")
+
+print(ado_fecal_abx_for_chorio)
+
+#abx_for_pprom
+
+ado_fecal_abx_for_pprom <- adonis(dm_fecal ~ abx_for_pprom, data=fecal_rar$map_loaded, permutations=999, method="euclidean")
+
+print(ado_fecal_abx_for_pprom)
+
+#abx_during_pregnancy
+
+fecal_rar_other_abx_during_pregnancy = filter_data(fecal_rar, 'other_abx_during_pregnancy', filter_vals = 'not collected')
+
+dm_fecal_other_abx_during_pregnancy = calc_dm(fecal_rar_other_abx_during_pregnancy$data_loaded)
+
+ado_fecal_other_abx_during_pregnancy <- adonis(dm_fecal_other_abx_during_pregnancy ~ other_abx_during_pregnancy, data=fecal_rar$map_loaded, permutations=999, method="euclidean")
+
+print(ado_fecal_other_abx_during_pregnancy)
+
+#type_of_milk
+
+ado_fecal_type_of_milk <- adonis(dm_fecal ~ type_of_milk, data=fecal_rar$map_loaded, permutations=999, method="euclidean")
+
+print(ado_fecal_type_of_milk)
+
+#delivery_method
+
+fecal_rar_delivery_method = filter_data(fecal_rar, 'delivery_method', filter_vals = 'not applicable')
+
+dm_fecal_delivery_method = calc_dm(fecal_rar_delivery_method$data_loaded)
+
+ado_fecal_delivery_method <- adonis(dm_fecal_delivery_method ~ delivery_method, data=fecal_rar$map_loaded, permutations=999, method="euclidean")
+
+print(ado_fecal_delivery_method)
+
+#infant_abx
+
+fecal_rar_abx = filter_data(fecal_rar, 'infant_abx', filter_vals = 'not applicable')
+
+dm_fecal_abx = calc_dm(fecal_rar_abx$data_loaded)
+
+ado_fecal_infant_abx <- adonis(dm_fecal ~ infant_abx, data=fecal_rar$map_loaded, permutations=999, method="euclidean")
+
+print(ado_fecal_infant_abx)
+
+#infant_steroid
+
+ado_fecal_infant_steroid <- adonis(dm_fecal ~ infant_steroid, data=fecal_rar$map_loaded, permutations=999, method="euclidean")
+
+print(ado_fecal_infant_steroid)
+
+#infant_antifungal
+
+ado_fecal_infant_antifungal <- adonis(dm_fecal ~ infant_antifungal, data=fecal_rar$map_loaded, permutations=999, method="euclidean")
+
+print(ado_fecal_infant_antifungal)
+
+#maternal asthma diagnosis
+
+fecal_rar_diag = filter_data(fecal_rar, 'Diagnosis', filter_vals = 'not applicable')
+
+dm_fecal_diag = calc_dm(fecal_rar_diag$data_loaded)
+
+ado_fecal_diag <- adonis(dm_fecal_diag ~ Diagnosis, data=fecal_rar_diag$map_loaded, permutations=999, method="euclidean")
+
+print(ado_fecal_diag)
+
+#timepoint
+
+ado_timpoint <- adonis(dm_fecal~ timepoint, data=fecal_diagnosis$map_loaded, permutations=999, method="euclidean")
+
+print(ado_timpoint)
+
+#maternal asthma diagnosis - timepoint 1
+
+fecal_rar_T1 = filter_data(fecal_rar_diag, 'timepoint', keep_vals = 'Timepoint 1')
+
+dm_fecal_T1 = calc_dm(fecal_rar_T1$data_loaded)
+
+ado_fecal_T1 <- adonis(dm_fecal_T1 ~ Diagnosis, data=fecal_rar_T1$map_loaded, permutations=999, method="euclidean")
+
+print(ado_fecal_T1)
+
+#maternal asthma diagnosis - timepoint 2
+
+fecal_rar_T2 = filter_data(fecal_rar_diag, 'timepoint', keep_vals = 'Timepoint 2')
+
+dm_fecal_T2 = calc_dm(fecal_rar_T2$data_loaded)
+
+ado_fecal_T2 <- adonis(dm_fecal_T2 ~ Diagnosis, data=fecal_rar_T2$map_loaded, permutations=999, method="euclidean")
+
+print(ado_fecal_T2)
+
+#maternal asthma diagnosis - timepoint 3
+
+fecal_rar_T3 = filter_data(fecal_rar_diag, 'timepoint', keep_vals = 'Timepoint 3')
+
+dm_fecal_T3 = calc_dm(fecal_rar_T3$data_loaded)
+
+ado_fecal_T3 <- adonis(dm_fecal_T3 ~ Diagnosis, data=fecal_rar_T3$map_loaded, permutations=999, method="euclidean")
+
+print(ado_fecal_T3)
+
+#bottle feeding started
+
+fecal_rar_bottle_feeding_started_NCrem = filter_data(fecal_rar, 'bottle_feeding_started', filter_vals = 'not collected')
+
+dm_fecal_bottle_feeding_started_NCrem = calc_dm(fecal_rar_bottle_feeding_started_NCrem$data_loaded)
+
+ado_fecal_bottle_feeding_started <- adonis(dm_fecal_bottle_feeding_started_NCrem ~ bottle_feeding_started, data=fecal_rar_bottle_feeding_started_NCrem$map_loaded, permutations=999, method="euclidean")
+
+print(ado_fecal_bottle_feeding_started)
+
+#breast feeding started
+
+fecal_rar_breastfeeding_started_NCrem = filter_data(fecal_rar, 'breastfeeding_started', filter_vals = 'not collected')
+
+dm_fecal_breastfeeding_started_NCrem = calc_dm(fecal_rar_breastfeeding_started_NCrem$data_loaded)
+
+ado_fecal_breastfeeding_started <- adonis(dm_fecal_breastfeeding_started_NCrem ~ breastfeeding_started, data=fecal_rar_breastfeeding_started_NCrem$map_loaded, permutations=999, method="euclidean")
+
+print(ado_fecal_breastfeeding_started)
+
+#community composition repeated for timepoint 3 only
+
+ado_fecal_3_abx_during_delivery <- adonis(dm_fecal_3 ~ abx_during_delivery, data=fecal_rar_3$map_loaded, permutations=999, method="euclidean")
+
+print(ado_fecal_3_abx_during_delivery)
+
+ado_fecal_3_abx_during_pregnancy <- adonis(dm_fecal_3 ~ abx_during_pregnancy, data=fecal_rar_3$map_loaded, permutations=999, method="euclidean")
+
+print(ado_fecal_3_abx_during_pregnancy)
+
+ado_fecal_3_abx_for_chorio <- adonis(dm_fecal_3 ~ abx_for_chorio, data=fecal_rar_3$map_loaded, permutations=999, method="euclidean")
+
+print(ado_fecal_3_abx_for_chorio)
+
+ado_fecal_3_abx_for_pprom <- adonis(dm_fecal_3 ~ abx_for_pprom, data=fecal_rar_3$map_loaded, permutations=999, method="euclidean")
+
+print(ado_fecal_3_abx_for_pprom)
+
+ado_fecal_3_other_abx_during_pregnancy <- adonis(dm_fecal_3 ~ other_abx_during_pregnancy, data=fecal_rar_3$map_loaded, permutations=999, method="euclidean")
+
+print(ado_fecal_3_other_abx_during_pregnancy)
+
+ado_fecal_3_delivery_method <- adonis(dm_fecal_3 ~ delivery_method, data=fecal_rar_3$map_loaded, permutations=999, method="euclidean")
+
+print(ado_fecal_3_delivery_method)
+
+fecal_rar_3_type_of_milk = filter_data(fecal_rar, 'type_of_milk', keep_vals = c('Fecal','not collected'))
+
+dm_fecal_3 = calc_dm(fecal_rar_3_type_of_milk$data_loaded)
+
+ado_fecal_3_type_of_milk <- adonis(dm_fecal_3 ~ type_of_milk, data=fecal_rar_3_type_of_milk$map_loaded, permutations=999, method="euclidean")
+
+print(ado_fecal_3_type_of_milk)
+
